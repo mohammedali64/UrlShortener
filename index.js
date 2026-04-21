@@ -1,6 +1,10 @@
 require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
+const dns = require('dns');
+const { URL } = require('url');
+
 const app = express();
 
 // Basic Configuration
@@ -16,48 +20,70 @@ app.get('/', function (req, res) {
   res.sendFile(process.cwd() + '/views/index.html');
 });
 
-// Your first API endpoint
+// Test endpoint
 app.get('/api/hello', function (req, res) {
   res.json({ greeting: 'hello API' });
 });
 
+// In-memory storage
 let urls = [];
-let id = 1;
+let currentId = 1;
 
-function isValidUrl(userInput) {
+// POST - Create short URL
+app.post('/api/shorturl', function (req, res) {
+  const originalUrl = req.body.url;
+
+  let parsedUrl;
+
   try {
-    let url = new URL(userInput);
-    return url.protocol === "http:" || url.protocol === "https:";
+    parsedUrl = new URL(originalUrl);
   } catch (err) {
-    return false;
-  }
-}
-
-app.post("/api/shorturl", (req, res) => {
-  const original = req.body.url;
-
-  if (!isValidUrl(original)) {
-    return res.json({ error: "invalid url" });
+    return res.json({ error: 'invalid url' });
   }
 
-  urls.push({ id: id, url: original });
+  // Only allow http / https
+  if (
+    parsedUrl.protocol !== 'http:' &&
+    parsedUrl.protocol !== 'https:'
+  ) {
+    return res.json({ error: 'invalid url' });
+  }
 
-  res.json({
-    original_url: original,
-    short_url: id
+  // DNS lookup to validate hostname
+  dns.lookup(parsedUrl.hostname, function (err) {
+    if (err) {
+      return res.json({ error: 'invalid url' });
+    }
+
+    const newEntry = {
+      short_url: currentId,
+      original_url: originalUrl
+    };
+
+    urls.push(newEntry);
+
+    res.json(newEntry);
+
+    currentId++;
   });
-
-  id++;
-});
-app.get("/api/shorturl/:id", (req, res) => {
-  const shortId = Number(req.params.id);
-  const entry = urls.find(obj => obj.id === shortId);
-
-  if (!entry) return res.json({ error: "No short URL found" });
-
-  return res.redirect(entry.url);
 });
 
+// GET - Redirect short URL
+app.get('/api/shorturl/:short_url', function (req, res) {
+  const shortId = parseInt(req.params.short_url);
+
+  const foundUrl = urls.find(
+    (item) => item.short_url === shortId
+  );
+
+  if (!foundUrl) {
+    return res.json({ error: 'No short URL found' });
+  }
+
+  res.redirect(foundUrl.original_url);
+});
+
+// Start server
 app.listen(port, function () {
   console.log(`Listening on port ${port}`);
 });
