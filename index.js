@@ -41,7 +41,6 @@ app.post('/api/shorturl', function (req, res) {
     return res.json({ error: 'invalid url' });
   }
 
-  // Only allow http / https
   if (
     parsedUrl.protocol !== 'http:' &&
     parsedUrl.protocol !== 'https:'
@@ -49,7 +48,6 @@ app.post('/api/shorturl', function (req, res) {
     return res.json({ error: 'invalid url' });
   }
 
-  // DNS lookup to validate hostname
   dns.lookup(parsedUrl.hostname, function (err) {
     if (err) {
       return res.json({ error: 'invalid url' });
@@ -57,7 +55,7 @@ app.post('/api/shorturl', function (req, res) {
 
     const newEntry = {
       short_url: currentId,
-      original_url: originalUrl
+      original_url: parsedUrl.href
     };
 
     urls.push(newEntry);
